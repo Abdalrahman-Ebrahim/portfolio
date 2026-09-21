@@ -3818,32 +3818,37 @@
     const messageEl = form.querySelector('#inputMessage');
     const missing   = [nameEl, emailEl, messageEl].filter(el => !el.value.trim());
     if (missing.length) {
-      missing[0].focus();   // nudges :invalid CSS state on the first empty field
+      missing[0].focus();
       return;
     }
 
-    setFormState('loading');
+    // ── Capture FormData FIRST — before loading state disables inputs ──
+    // Disabled <input> elements are excluded from FormData by the browser.
+    // Calling new FormData(form) after setFormState('loading') would send an
+    // empty body, causing Formspree to return 400 "Bad form post request".
+    const formData = new FormData(form);
+
+    setFormState('loading');   // disable inputs + show spinner AFTER capture
 
     // ── AJAX submission — never redirects ─────────────────────────
     try {
       const res = await fetch('https://formspree.io/f/xljdeqrd', {
         method:  'POST',
         headers: { 'Accept': 'application/json' },
-        body:    new FormData(form),
+        body:    formData,   // pre-captured — all fields present and valid
       });
 
       if (res.ok) {
-        setFormState('success');   // clears fields + shows green inline banner
+        setFormState('success');   // green inline banner + form.reset()
       } else {
         const payload = await res.json().catch(() => ({}));
         console.error('[Formspree] rejected:', res.status, payload);
-        setFormState('error');     // shows red inline banner
+        setFormState('error');     // red inline banner
       }
 
     } catch (err) {
-      // Network error or CORS block (e.g. file:// — use a local server to test)
       console.warn('[Contact] fetch error:', err.message);
-      setFormState('error');       // shows red inline banner — no redirect
+      setFormState('error');       // red inline banner — no redirect
     }
   });
 </script>
