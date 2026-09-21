@@ -3810,52 +3810,40 @@
   }
 
   form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+    e.preventDefault();   // always prevent — no native POST, no redirect, ever
 
-    // ── Client-side validation ──────────────────────────────────────
+    // ── Client-side validation ────────────────────────────────────
     const nameEl    = form.querySelector('#inputName');
     const emailEl   = form.querySelector('#inputEmail');
     const messageEl = form.querySelector('#inputMessage');
     const missing   = [nameEl, emailEl, messageEl].filter(el => !el.value.trim());
     if (missing.length) {
-      missing[0].focus();   // trigger :invalid CSS on first empty required field
+      missing[0].focus();   // nudges :invalid CSS state on the first empty field
       return;
     }
 
     setFormState('loading');
 
-    // ── Protocol detection ─────────────────────────────────────────
-    // file:// origins are blocked by CORS; fetch will throw before even reaching
-    // Formspree.  Fall back to a native browser POST immediately.
-    if (window.location.protocol === 'file:') {
-      console.info('[Contact form] file:// origin detected — using native POST fallback.');
-      formInputs.forEach(el => el.disabled = false);  // re-enable so fields submit
-      form.submit();   // browser redirects to Formspree's hosted thank-you page
-      return;
-    }
-
-    // ── Fetch submission (served over http/https) ──────────────────
+    // ── AJAX submission — never redirects ─────────────────────────
     try {
       const res = await fetch('https://formspree.io/f/xljdeqrd', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Accept': 'application/json' },
-        body: new FormData(form),
+        body:    new FormData(form),
       });
 
       if (res.ok) {
-        setFormState('success');
+        setFormState('success');   // clears fields + shows green inline banner
       } else {
-        // Log the full Formspree error payload to console for debugging
         const payload = await res.json().catch(() => ({}));
-        console.error('[Formspree] Submission rejected:', res.status, payload);
-        setFormState('error');
+        console.error('[Formspree] rejected:', res.status, payload);
+        setFormState('error');     // shows red inline banner
       }
 
     } catch (err) {
-      // Network error or CORS block despite http(s) — still fall back gracefully
-      console.warn('[Contact form] fetch failed, falling back to native POST:', err.message);
-      formInputs.forEach(el => el.disabled = false);
-      form.submit();
+      // Network error or CORS block (e.g. file:// — use a local server to test)
+      console.warn('[Contact] fetch error:', err.message);
+      setFormState('error');       // shows red inline banner — no redirect
     }
   });
 </script>
